@@ -4,7 +4,6 @@ import time
 import random
 import threading
 from urllib import request
-from numpy import kaiser
 
 # Model = ['EfficientNet_L', 'EfficientNet_M',EfficientNet_S,'MobileNet_v1']
 
@@ -43,7 +42,6 @@ def Initialize():
             time.sleep(0.000001)
 
 
-# @profilek
 def Write():
     # 1초에 몇번 보내는지 출력
     global ToServer
@@ -52,17 +50,17 @@ def Write():
     ##############
     start = time.perf_counter()
     iter = 0
-    period = 0.1#초
-    segment_num = 3
+    period = 0.2
+    
+    segment_num = 3 
     while True:
         # 주기적으로 서버로 write
         if time.perf_counter() - start > period * iter:
             # img = random.choice(os.listdir("./imageDir"))
-            img = "n0153282900000036.jpg"
+            img =  "n0153282900000036.jpg"
             request_time = time.perf_counter()
             args = '{} {} {} {} {}'.format(str(pid), img, str(request_time),str(period), str(segment_num)).encode()
             os.write(ToServer, args)
-            # print(time.time()* 1000)
             num = num + 1
             iter = iter + 1
 
@@ -78,8 +76,8 @@ def Read():
     # print('Read From Server {}'.format(FromServer))
     while True:
         readMsg = (os.read(FromServer, 1024)).decode()
-        # if readMsg:
-        #     print(readMsg)
+        if readMsg:
+            print(readMsg)
 
 
 if __name__ == '__main__':

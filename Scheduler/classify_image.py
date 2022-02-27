@@ -90,7 +90,7 @@ class NamedPipe:
         while True:
             msg = os.read(from_client, 100).decode()
             try:
-                pid, image_path, request_time, period = msg.split(' ')
+                pid, image_path, request_time, period,segment_num = msg.split(' ')
             except(ValueError):
                 print(msg)
             pid = int(pid)
@@ -119,15 +119,15 @@ class Interpreter:
         
     def make_model_path_list(self):
         self.model_path_list = []
-        # model = '/home/hun/WorkSpace/coral/pycoral/models/result/SM_1/efficientnet-edgetpu-L_quant_edgetpu.tflite'
-        # modelName = 'EfficientNet_L'
-        # self.model_path_list.append((modelName, model))
+        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SML_Origin/efficientnet-edgetpu-L_quant_edgetpu.tflite'
+        modelName = 'EfficientNet_L'
+        self.model_path_list.append((modelName, model))
 
-        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SM_Origin/efficientnet-edgetpu-M_quant_edgetpu.tflite'
+        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SML_Origin/efficientnet-edgetpu-M_quant_edgetpu.tflite'
         modelName = 'EfficientNet_M'
         self.model_path_list.append((modelName, model))
 
-        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SM_Origin/efficientnet-edgetpu-S_quant_edgetpu.tflite'
+        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SML_Origin/efficientnet-edgetpu-S_quant_edgetpu.tflite'
         modelName = 'EfficientNet_S'
         self.model_path_list.append((modelName, model))
 

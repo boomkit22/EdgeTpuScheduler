@@ -76,8 +76,8 @@ def Read():
     # print('Read From Server {}'.format(FromServer))
     while True:
         readMsg = (os.read(FromServer, 1024)).decode()
-        # if readMsg:
-        #     print(readMsg)
+        if readMsg:
+            print(readMsg)
 
 
 if __name__ == '__main__':
