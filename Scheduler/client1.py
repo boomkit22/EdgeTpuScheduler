@@ -50,7 +50,7 @@ def Write():
     ##############
     start = time.perf_counter()
     iter = 0
-    period = 0.2
+    period = 0.1
     
     segment_num = 3 
     while True:

@@ -71,7 +71,7 @@ class NamedPipe:
 
     def make_client_pipe(self):
         i = 0
-        client_num = 3
+        client_num = 4
         while True:
             readmsg = (os.read(self.listenPipe, 100)).decode()
             if readmsg:
@@ -257,7 +257,7 @@ class Scheduler:
         self.labels = read_label_file(
             '/home/hun/WorkSpace/coral/pycoral/test_data/labels.txt')
         self.intermediate_output = []
-        self.output = 0
+        self.prev_output = {}
 
     def schedule(self):
         while True:
@@ -278,10 +278,11 @@ class Scheduler:
                     if self.intermediate_output[i]["priority"] > segment_max_priority:
                         segment_max_priority = self.intermediate_output[i]["priority"]
                         # print(self.intermediate_output[i]["priority"])
+
                 for i in range(len(NamedPipe.request_list)):
                     task_priority = 1 / NamedPipe.request_list[i][3]
                     # print('task_priority = {}, segment_max_priority = {}'.format(task_priority, segment_max_priority))
-                    
+
                     if task_priority > segment_max_priority:
                         execute_segment_flag = False
                         execute_request_flag = True
@@ -305,14 +306,15 @@ class Scheduler:
                 self.intermediate_output.sort(
                     key=lambda x: x["priority"], reverse=True)
                 next_task = self.intermediate_output.pop(0)
-                pid = next_task["pid"]
-                segment_intermediate_output = next_task["intermediate_output"]
+                to_client = next_task["to_client"]
+                self.prev_output = next_task["intermediate_output"]
                 next_index = next_task["next_index"]
                 segment_num = next_task["segment_num"]
                 modelName = next_task["model_name"]
                 priority = next_task["priority"]
                 request_time = next_task["request_time"]
                 deadline = next_task["deadline"]
+                print('{} was preempted'.format(modelName))
                 # print('executing preempted segment model = {}  ,index = {}'.format(modelName, next_index))
 
                 # 현재 실행하고 있는 task를 기록해둔다
@@ -328,21 +330,23 @@ class Scheduler:
                     # executing last segment
                     # 마지막 segment를 실행 한 후에는 classify.get_classes를 진행 후 client에게 write
                     if i == segment_num - 1:
-                        self.invoke_last_index(modelName,i,ToClient,request_time,deadline)
+                        print(' i == segment_num - 1')
+                        self.invoke_last_index(modelName,i,to_client,request_time,deadline)
                     # executing middle segment
                     # 중간에 preempt될 가능성 있음
                     else:
+                        print('else')
                         # print('i is not segment_num - 1   , i == {}'.format(i))
-                        output = self.invoke_middle_index(modelName,i)
+                        self.prev_output = self.invoke_middle_index(modelName,i)
 
                         preempt_lock.acquire()
                         # preempt flag가 true면 이번 segment output 저장
                         if NamedPipe.preempt_flag == True:
                             # print('****************************preempt in preempt')
                             self.intermediate_output.append({"model_name": modelName,
-                                                             "pid": pid,
+                                                             "to_client": to_client,
                                                              "priority": priority,
-                                                             "intermediate_output": segment_intermediate_output,
+                                                             "intermediate_output": self.prev_output,
                                                              "next_index": i+1,
                                                              "segment_num": segment_num,
                                                              "request_time": request_time,
@@ -362,7 +366,7 @@ class Scheduler:
                 pid = who[0]
                 period = who[3]
                 modelName = NamedPipe.process_dict[pid][0]
-                ToClient = NamedPipe.process_dict[pid][1]
+                to_client = NamedPipe.process_dict[pid][1]
                 NamedPipe.current_task["model_name"] = modelName
                 NamedPipe.current_task["priority"] = 1/period
 
@@ -379,23 +383,21 @@ class Scheduler:
 
                 # 요청을 받으면 모델과 interpreter를 만들어서
 
-                count = 5
-
-             
                 for i in range(segment_num):
                     # executing first segment
                     # image resize 하는 부분 필요
                     if i == 0:
-                        output = self.invoke_first_index(modelName,i,imagePath)
+                        self.prev_output = self.invoke_first_index(modelName,i,imagePath)
 
                         preempt_lock.acquire()
                         if NamedPipe.preempt_flag == True:
                             # print('{} is preempted! next index = {}'.format(modelName,i+1))
                             self.intermediate_output.append({"model_name": modelName,
-                                                             "pid": pid,
+                                                             "to_client": to_client,
                                                              "priority": 1 / period,
-                                                             "intermediate_output": output,
+                                                             "intermediate_output": self.prev_output,
                                                              "next_index": i+1,
+                                                             "segment_num": segment_num,
                                                              "request_time": request_time,
                                                              "deadline": deadline})
                             preempt_lock.release()
@@ -406,21 +408,21 @@ class Scheduler:
                     # executing last segment
                     # classfiy.get_classes후 client에 write하는 과정 필요
                     elif i == segment_num - 1:
-                        self.invoke_last_index(modelName,i,ToClient,request_time,deadline)
-                       
+                        self.invoke_last_index(modelName,i,to_client,request_time,deadline)
+
                     # executing middle segment
                     # 중간에 preempt될 가능성 있음
                     else:
-                        output = self.invoke_middle_index(modelName,i)
+                        self.prev_output = self.invoke_middle_index(modelName,i)
 
                         preempt_lock.acquire()
                         # preempt flag가 true면 이번 segment output 저장
                         if NamedPipe.preempt_flag == True:
                             # print('{} is preempted! next index = {}'.format(modelName,i+1))
                             self.intermediate_output.append({"model_name": modelName,
-                                                             "pid": pid,
+                                                             "to_client": to_client,
                                                              "priority": 1 / period,
-                                                             "intermediate_output": output,
+                                                             "intermediate_output": self.prev_output,
                                                              "next_index": i+1,
                                                              "segment_num": segment_num,
                                                              "request_time": request_time,
@@ -463,18 +465,43 @@ class Scheduler:
             common.set_input(
                 assigned_interpreter, normalized_input.astype(np.uint8))
         assigned_interpreter.invoke()
-        tensor_index = assigned_interpreter.get_output_details()[
-            0]['index']
-        self.output = assigned_interpreter.get_tensor(tensor_index)
-        return self.output
+
+        for output_detail in assigned_interpreter.get_output_details():
+            self.prev_output[output_detail['name']] =  assigned_interpreter.get_tensor(output_detail['index'])
+
+        return self.prev_output
+
+    def invoke_middle_index(self, model_name, i):
+        assigned_interpreter = interpreter.model_interpreter_dict[model_name][i]
+
+        for input_detail in assigned_interpreter.get_input_details():
+            for key,value in self.prev_output.items():
+                if key == input_detail['name']:
+                    tensor_index = input_detail['index']
+                    assigned_interpreter.set_tensor(tensor_index, value)
+        # common.set_input(assigned_interpreter, self.output)
+        assigned_interpreter.invoke()
+
+        for output_detail in assigned_interpreter.get_output_details():
+            self.prev_output[output_detail['name']] =  assigned_interpreter.get_tensor(output_detail['index'])
+
+        return self.prev_output
+
 
     def invoke_last_index(self,model_name,i,to_client,request_time,deadline):
         assigned_interpreter = interpreter.model_interpreter_dict[model_name][i]
-        common.set_input(assigned_interpreter, self.output)
+
+        for input_detail in assigned_interpreter.get_input_details():
+            for key,value in self.prev_output.items():
+                if key == input_detail['name']:
+                    tensor_index = input_detail['index']
+                    assigned_interpreter.set_tensor(tensor_index, value)
+
         assigned_interpreter.invoke()
 
         classes = classify.get_classes(
             assigned_interpreter, 3, 0.0)
+
         msg = ''
         for c in classes:
             msg = msg + ('%s: %.5f\n' %
@@ -482,8 +509,8 @@ class Scheduler:
         os.write(to_client, msg.encode())
 
         response_time = time.perf_counter() - request_time
-        print('response_time = {}ms'.format(
-            response_time * 1000))
+
+        # print('response_time = {}ms'.format(response_time * 1000))
 
         if response_time < deadline:
             # print('------------------------------------------')
@@ -493,14 +520,6 @@ class Scheduler:
             Scheduler.fail = Scheduler.fail + 1
 
 
-    def invoke_middle_index(self, model_name, i):
-        assigned_interpreter = interpreter.model_interpreter_dict[model_name][i]
-        common.set_input(assigned_interpreter, self.output)
-        assigned_interpreter.invoke()
-        tensor_index = assigned_interpreter.get_output_details()[
-            0]['index']
-        self.output = assigned_interpreter.get_tensor(tensor_index)
-        return self.output
 
     def run(self):
         self.schedule_thread = threading.Thread(target=self.schedule, args=())

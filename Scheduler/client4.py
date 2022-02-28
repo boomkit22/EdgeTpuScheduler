@@ -50,7 +50,7 @@ def Write():
     ##############
     start = time.perf_counter()
     iter = 0
-    period = 0.80
+    period = 0.02
     segment_num = 3 
     while True:
         # 주기적으로 서버로 write

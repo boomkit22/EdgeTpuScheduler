@@ -118,8 +118,7 @@ def main():
     intermediate_output = {}
 
     interpreter[0].invoke()
-    for output_detail in interpreter[0].get_output_details():
-        intermediate_output[output_detail['name']] =  interpreter[0].get_tensor(output_detail['index'])
+
 
     # print(intermediate_output)
     # print('-----------------------------')
@@ -129,10 +128,12 @@ def main():
             if key == input_detail['name']:
                 tensor_index = input_detail['index']
                 interpreter[1].set_tensor(tensor_index, value)
+
  
     interpreter[1].invoke()
     for output_detail in interpreter[1].get_output_details():
         intermediate_output[output_detail['name']] = interpreter[1].get_tensor(output_detail['index'])
+
  
     for input_detail in interpreter[2].get_input_details():
         for key,value in intermediate_output.items():
@@ -140,8 +141,8 @@ def main():
                 tensor_index = input_detail['index']
                 interpreter[2].set_tensor(tensor_index, value)
 
-    interpreter[2].invoke()
 
+    interpreter[2].invoke()
     classes = classify.get_classes(interpreter[2], top_k, threshold)
 
     for c in classes:
