@@ -264,13 +264,12 @@ class Scheduler:
     def schedule(self):
         while True:
             time.sleep(1e-9)
-            while_start = time.perf_counter()
+            # while_start = time.perf_counter()
             # preempt된 task부터 있는지 확인
             # intermediate_output을 저장해둔것이 있으면 preempt된 task가 있는 것
             execute_segment_flag = False
             execute_request_flag = False
 
-            lock_start = time.perf_counter()
             lock.acquire()
 
             if len(self.intermediate_output) != 0 and len(NamedPipe.request_list) != 0:
@@ -295,9 +294,7 @@ class Scheduler:
             elif len(self.intermediate_output) == 0 and len(NamedPipe.request_list) != 0:
                 execute_segment_flag = False
                 execute_request_flag = True
-
             lock.release()
-            lock_time = (time.perf_counter() - lock_start) * 1000
 
             # intermediate_output and request_list are not empty
 

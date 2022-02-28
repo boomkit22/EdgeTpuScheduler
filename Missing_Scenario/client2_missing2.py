@@ -50,17 +50,18 @@ def Write():
     ##############
     start = time.perf_counter()
     iter = 0
-    period = 1
+    period = 0.2
     segment_num = 3 
     while True:
         # 주기적으로 서버로 write
+        time.sleep(1e-9)
         if time.perf_counter() - start > period * iter:
             # img = random.choice(os.listdir("./imageDir"))
             img = "n0153282900000036.jpg"
             request_time = time.perf_counter()
             args = '{} {} {} {}'.format(str(pid), img, str(request_time),str(period)).encode()
             os.write(ToServer, args)
-            print(time.time()* 1000)
+            # print(time.time()* 1000)
             num = num + 1
             iter = iter + 1
 

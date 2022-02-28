@@ -51,7 +51,7 @@ def Write():
     ##############
     start = time.perf_counter()
     iter = 0
-    period = 0.02
+    period = 0.05 # 20ms
     segment_num = 3 
     lock = threading.Lock()
     while True:
@@ -75,10 +75,10 @@ def Write():
 def Read():
     global FromServer
     # print('Read From Server {}'.format(FromServer))
-    # while True:
-        # readMsg = (os.read(FromServer, 1024)).decode()
-        # if readMsg:
-        #     print(readMsg)
+    while True:
+        readMsg = (os.read(FromServer, 1024)).decode()
+        if readMsg:
+            print(readMsg)
 
 
 if __name__ == '__main__':

@@ -65,9 +65,12 @@ class NamedPipe:
         self.listenPipe = os.open(self.path, os.O_RDONLY)
 
     def make_client_pipe(self):
+        i = 0
+        client_num = 2
         while True:
             readmsg = (os.read(self.listenPipe, 100)).decode()
             if readmsg:
+                i = i + 1
                 pid, modelName = readmsg.split(' ')
                 ServerWritePath = './Pipe/' + 'ServerTo' + str(pid) + '_Pp'
                 if os.path.exists(ServerWritePath):
@@ -80,7 +83,9 @@ class NamedPipe:
                 ReadWritePipe = threading.Thread(target=self.read_and_write_to_queue, args=(
                     pid, modelName, ServerWritePath, ClientWritePath))
                 ReadWritePipe.start()
-                break
+                if i == client_num:
+                    print('full client')
+                    break   
 
     def read_and_write_to_queue(self, pid, model_name, server_write_path, client_write_path):
         to_client = os.open(server_write_path, os.O_WRONLY)
@@ -89,15 +94,14 @@ class NamedPipe:
         NamedPipe.process_dict[pid] = (model_name, to_client)
         while True:
             msg = os.read(from_client, 100).decode()
-            try:
-                pid, image_path, request_time, period = msg.split(' ')
-            except(ValueError):
-                print(msg)
-            pid = int(pid)
-            period = float(period)
-            request_time = float(request_time)
             if msg:
-                print(time.time()*1000)
+                try:
+                    pid, image_path, request_time, period = msg.split(' ')
+                except(ValueError):
+                    print(msg)
+                pid = int(pid)
+                period = float(period)
+                request_time = float(request_time)
                 lock.acquire()
                 NamedPipe.request_list.append((pid, image_path, request_time, period))
                 lock.release()
@@ -123,11 +127,11 @@ class Interpreter:
         # modelName = 'EfficientNet_L'
         # self.model_path_list.append((modelName, model))
 
-        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SM_Origin/efficientnet-edgetpu-M_quant_edgetpu.tflite'
+        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SM_1/efficientnet-edgetpu-M_quant_edgetpu.tflite'
         modelName = 'EfficientNet_M'
         self.model_path_list.append((modelName, model))
 
-        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SM_Origin/efficientnet-edgetpu-S_quant_edgetpu.tflite'
+        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SM_1/efficientnet-edgetpu-S_quant_edgetpu.tflite'
         modelName = 'EfficientNet_S'
         self.model_path_list.append((modelName, model))
 
@@ -138,6 +142,7 @@ class Interpreter:
     def initialize_dict(self):
         self.make_model_path_list()
         for model in self.model_path_list:
+            print(model[1])
             Interpreter = make_interpreter(model[1])
             Interpreter.allocate_tensors()
             self.model_interpreter_dict[model[0]] = Interpreter
@@ -155,8 +160,8 @@ class Analyzer:
             self.request_num = Scheduler.success + Scheduler.fail
             self.request_per_sec = self.request_num - self.prev_request_num
             self.prev_request_num = self.request_num
-            # print('SUCCESS : {} FAIL : {}  ReqPerSec : {}'.format(Scheduler.success,
-            # Scheduler.fail,self.request_per_sec))
+            print('SUCCESS : {} FAIL : {}  ReqPerSec : {}'.format(Scheduler.success,
+            Scheduler.fail,self.request_per_sec))
             time.sleep(1)
             
     def run(self):
@@ -176,9 +181,12 @@ class Scheduler:
 
     
     def schedule(self):
+         M = open('Efficient_M','w')
+         S = open('Efficient_S','w')
          while True:
+            time.sleep(1e-9)
+            while_start = time.perf_counter()
             if len(NamedPipe.request_list) != 0:
-                loopStartTime = time.perf_counter()
                 # print(len(request_list))
                 ##FIFO##
                 lock.acquire()
@@ -202,9 +210,7 @@ class Scheduler:
                 threshold = 0.0
                 top_k = 3
 
-                schedulingOverheadTime = time.perf_counter() - loopStartTime
 
-                imageResizeStart = time.perf_counter()
 
                 if common.input_details(assigned_interpreter, 'dtype') != np.uint8:
                     raise ValueError('Only support uint8 input type.')
@@ -222,45 +228,49 @@ class Scheduler:
                 mean = 128.0
                 std = 128.0
 
-                imageResizeTime = time.perf_counter() - imageResizeStart
 
-                setInputStart = time.perf_counter()
                 if abs(scale * std - 1) < 1e-5 and abs(mean - zero_point) < 1e-5:
                     # Input data does not require preprocessing.
-                    preprocessingFlag = 0
                     common.set_input(assigned_interpreter, image)
                 else:
                     # Input data requires preprocessing
-                    preprocessingFlag = 1
                     normalized_input = (np.asarray(image) - mean) / \
                         (std * scale) + zero_point
                     np.clip(normalized_input, 0, 255, out=normalized_input)
                     common.set_input(
                         assigned_interpreter, normalized_input.astype(np.uint8))
-                setInputTime = time.perf_counter() - setInputStart
-                tpuInvokeStart = time.perf_counter()
 
                 for _ in range(1):
-                    start = time.perf_counter()
                     assigned_interpreter.invoke()
-                    inference_time = time.perf_counter() - start
-                    getClassesStart = time.perf_counter()
                     classes = classify.get_classes(assigned_interpreter, top_k, threshold)
-                    getClassesTime = time.perf_counter() - getClassesStart
 
                 msg = ''
                 for c in classes:
 
                     msg = msg + ('%s: %.5f\n' % (self.labels.get(c.id, c.id), c.score))
 
-                tpuInvokeTime = time.perf_counter() - tpuInvokeStart
                 os.write(ToClient, msg.encode())
+                response_time = time.perf_counter() - request_time
+                # while_end = time.perf_counter() - while_start
+                # print(while_end * 1000)
+                if modelName == 'EfficientNet_M':
+                    if Scheduler.success + Scheduler.fail < 2500:
+                        M.write(str(response_time * 1000) + '\n')
+                    else:
+                        M.close()
+                elif modelName == 'EfficientNet_S':
+                    if Scheduler.success + Scheduler.fail < 2500:
+                        S.write(str(response_time * 1000) + '\n')
+                    else:
+                        S.close()
 
-                if time.perf_counter() - loopStartTime < deadline:
+
+                # print('model = {} rp_time = {}'.format(modelName,response_time * 1000))
+
+                if time.perf_counter() - request_time < deadline:
                     # print((time.perf_counter() - request_time) * 1000)
                     # print('loop time = {:.3f}ms'.format(
-                    # (time.perf_counter() - loopStartTime)*1000))
-               
+                    # (time.perf_counter() - loopStartTime)*1000))               
                     Scheduler.success = Scheduler.success+1
                 else:
                     Scheduler.fail = Scheduler.fail + 1
@@ -298,11 +308,13 @@ if __name__ == '__main__':
     os.system('rm ./Pipe/*')
     named_pipe = NamedPipe()
     named_pipe.run()
+
     interpreter = Interpreter()
     interpreter.initialize_dict()
 
     scheduler = Scheduler(interpreter)
     scheduler.run()
+
     analyzer = Analyzer(scheduler)
     analyzer.run()
     
