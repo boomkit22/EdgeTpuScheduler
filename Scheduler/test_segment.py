@@ -45,9 +45,9 @@ def main():
         # modelName = 'EfficientNet_S'
         # self.model_path_dict[modelName] = [model_1, model_2, model_3]
 
-        # model_1 = '/home/hun/WorkSpace/coral/pycoral/model/segment//Mobilenet_V1/mobilenet_v1_1.0_224_quant_segment_0_of_3_edgetpu.tflite'
-        # model_2 = '/home/hun/WorkSpace/coral/pycoral/model/segment//Mobilenet_V1/mobilenet_v1_1.0_224_quant_segment_1_of_3_edgetpu.tflite'
-        # model_3 = '/home/hun/WorkSpace/coral/pycoral/model/segment//Mobilenet_V1/mobilenet_v1_1.0_224_quant_segment_2_of_3_edgetpu.tflite'
+        # model_1 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Mobilenet_V1/mobilenet_v1_1.0_224_quant_segment_0_of_3_edgetpu.tflite'
+        # model_2 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Mobilenet_V1/mobilenet_v1_1.0_224_quant_segment_1_of_3_edgetpu.tflite'
+        # model_3 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Mobilenet_V1/mobilenet_v1_1.0_224_quant_segment_2_of_3_edgetpu.tflite'
         # modelName = 'MobileNet_V1'
         # self.model_path_dict[modelName] = [model_1, model_2, model_3]
         
@@ -89,107 +89,163 @@ def main():
     image_resize_time = time.perf_counter() - image_resize_start
     print('imaze resize time = {}'.format(image_resize_time*1000))
 
-    print(interpreter[0].get_input_details())
-    print('----------------------------------------')
+# get_output_details()에서 name 빼오고
+# index를 사용하여 get_tensor로 output 저장
+# name : output으로 저장
+
+# 형식
+# 다음 실행 interpreter  { index : [ name : output , name : output  ]  }
+
+
+# get_input_details()에서 name과 index를 사용하여
+# set_tensor를 사용하여 이전 interpreter에서 output 빼온애의 name과 같은애의 output을 
+# index를 사용하여 set_tensor 한다
+
+    # print('----------------------------------------')
     print(interpreter[0].get_output_details())
-    print(interpreter[1].get_input_details())
     print('----------------------------------------')
+    # print(interpreter[1].get_input_details())
+    # print('----------------------------------------')
     print(interpreter[1].get_output_details())
-    print(interpreter[2].get_input_details())
-    print('---------------------------------------------')
-    print(interpreter[2].get_input_details())
+    print('----------------------------------------')
+    # print(interpreter[2].get_input_details())
+    print(interpreter[2].get_output_details())
     print('--------------------------------------------')
-    interpreter
+    print('--------------------------------------------')
+    print('--------------------------------------------')   
+    print('--------------------------------------------')
+
+    intermediate_output = {}
+
     interpreter[0].invoke()
-    print('----------------------------------------')
-    print(len(interpreter[0].get_output_details()))
-    output_detail_len = len(interpreter[0].get_output_details()) - 1
-    tensor_index = interpreter[0].get_output_details()[output_detail_len]['index']
-    print(interpreter[0].get_output_details())
-    output = interpreter[0].get_tensor(tensor_index)
-    common.set_input(interpreter[1], output)
+    for output_detail in interpreter[0].get_output_details():
+        intermediate_output[output_detail['name']] =  interpreter[0].get_tensor(output_detail['index'])
+
+    # print(intermediate_output)
+    # print('-----------------------------')
+    # print(interpreter[1].get_input_details())
+    for input_detail in interpreter[1].get_input_details():
+        for key,value in intermediate_output.items():
+            if key == input_detail['name']:
+                tensor_index = input_detail['index']
+                interpreter[1].set_tensor(tensor_index, value)
+ 
     interpreter[1].invoke()
-    # print(interpreter[1].get_output_details())
-    print('----------------------------------------')
-    # print(len(interpreter[1].get_output_details()))
-    print('interpreter 1 output details')
-    print(interpreter[1].get_output_details())
-    print('interpreter 1 output details')
+    for output_detail in interpreter[1].get_output_details():
+        intermediate_output[output_detail['name']] = interpreter[1].get_tensor(output_detail['index'])
+ 
+    for input_detail in interpreter[2].get_input_details():
+        for key,value in intermediate_output.items():
+            if key == input_detail['name']:
+                tensor_index = input_detail['index']
+                interpreter[2].set_tensor(tensor_index, value)
 
-
-    print('interpreter 2 input details')
-    print(interpreter[2].get_input_details())
-    print('interpreter 2 input details')
-
-    # output_detail_len = len(interpreter[1].get_output_details()) - 1
-    tensor_index = interpreter[1].get_output_details()[1]['index'] - 1
-    print('here = {} '.format(tensor_index))
-    output2 = interpreter[1].get_tensor(tensor_index)
-
-
-    # output3 = interpreter[1].get_tensor(1)
-    
-    common.set_input(interpreter[2],output2)
     interpreter[2].invoke()
+
+    classes = classify.get_classes(interpreter[2], top_k, threshold)
+
+    for c in classes:
+        print('%s: %.5f\n' % (labels.get(c.id, c.id), c.score))
+ 
+
+    # output = interpreter[0].get_tensor(0)
+    # interpreter[1].set_tensor(0,output)
+    # interpreter[1].invoke()
+    # output2_1 = interpreter[1].get_tensor(1)
+    # output2_2 = interpreter[1].get_tensor(2)
+
+    # print(output2_1)
+    # print('-----------------')
+    # print(output2_2)
+    # interpreter[2].set_tensor(1, output2_2)
+    # interpreter[2].set_tensor(0,output2_1)
+    # interpreter[2].invoke()
+
+    # print('------------------
+    # (labels.get(c.id, c.id), c.score))
+
+    # print(len(interpreter[0].get_output_details()))
+    # output_detail_len = len(interpreter[0].get_output_details()) - 1
+    # tensor_index = interpreter[0].get_output_details()[output_detail_len]['index']
+    # print(interpreter[0].get_output_details())
+    # output = interpreter[0].get_tensor(tensor_index)
+    # common.set_input(interpreter[1], output)
+    # interpreter[1].invoke()
+    # # print(interpreter[1].get_output_details())
+    # print('----------------------------------------')
+    # # print(len(interpreter[1].get_output_details()))
+    # print('interpreter 1 output details')
+    # print(interpreter[1].get_output_details())
+    # print('interpreter 1 output details')
+
+
+    # print('interpreter 2 input details')
+    # print(interpreter[2].get_input_details())
+    # print('interpreter 2 input details')
+
+    # # output_detail_len = len(interpreter[1].get_output_details()) - 1
+    # tensor_index = interpreter[1].get_output_details()[1]['index'] - 1
+    # print('here = {} '.format(tensor_index))
+    # output2 = interpreter[1].get_tensor(tensor_index)
+
+
+    # # output3 = interpreter[1].get_tensor(1)
+    
+    # common.set_input(interpreter[2],output2)
+    # interpreter[2].invoke()
     # output_detail_len = len(interpreter[1].get_output_details()) - 1
     # tensor_index = interpreter[1].get_output_details()[output_detail_len]['index']
     # interpreter[2].invoke()
 
-    classes = classify.get_classes(interpreter[2], top_k, threshold)
-    for c in classes:
-        print('%s: %.5f\n' % (labels.get(c.id, c.id), c.score))
 
 
-    
-    max_time_invoke = 0
-    first_max = 0
-    second_max = 0
-    third_max = 0
-    for i in range(1000):
+    # max_time_invoke = 0
+    # first_max = 0
+    # second_max = 0
+    # third_max = 0
+    # for i in range(1000):
+    #     first_start = time.perf_counter()
+    #     first_segment_start = time.perf_counter()
+    #     interpreter[0].invoke()
+    #     first_segment_time = time.perf_counter() - first_segment_start
+    #     if first_segment_time > first_max:
+    #         first_max = first_segment_time
+    #     output_detail_len = len(interpreter[0].get_output_details()) - 1
+    #     tensor_index = interpreter[0].get_output_details()[output_detail_len]['index']
+    #     output = interpreter[0].get_tensor(tensor_index)
+    #     common.set_input(interpreter[1], output)
+    #     second_segment_start = time.perf_counter()
+    #     interpreter[1].invoke()
+    #     second_segment_time = time.perf_counter() - second_segment_start
+    #     if second_segment_time > second_max:
+    #         second_max = second_segment_time
+    #     output_detail_len = len(interpreter[1].get_output_details()) - 1
+    #     tensor_index = interpreter[1].get_output_details()[output_detail_len]['index']
+    #     output2 = interpreter[1].get_tensor(tensor_index)
+    #     common.set_input(interpreter[2], output2)
+    #     third_segment_start = time.perf_counter()
+    #     interpreter[2].invoke()
+    #     third_segment_time = time.perf_counter() - third_segment_start
+    #     if third_segment_time > third_max:
+    #         third_max = third_segment_time
 
-        first_start = time.perf_counter()
+    #     classes = classify.get_classes(interpreter[2], top_k, threshold)
+    #     for c in classes:
+    #         print('%s: %.5f\n' % (labels.get(c.id, c.id), c.score))
 
-        first_segment_start = time.perf_counter()
-        interpreter[0].invoke()
-        first_segment_time = time.perf_counter() - first_segment_start
-        if first_segment_time > first_max:
-            first_max = first_segment_time
-        output_detail_len = len(interpreter[0].get_output_details()) - 1
-        tensor_index = interpreter[0].get_output_details()[output_detail_len]['index']
-        output = interpreter[0].get_tensor(tensor_index)
-        common.set_input(interpreter[1], output)
-        second_segment_start = time.perf_counter()
-        interpreter[1].invoke()
-        second_segment_time = time.perf_counter() - second_segment_start
-        if second_segment_time > second_max:
-            second_max = second_segment_time
-        output_detail_len = len(interpreter[1].get_output_details()) - 1
-        tensor_index = interpreter[1].get_output_details()[output_detail_len]['index']
-        output2 = interpreter[1].get_tensor(tensor_index)
-        common.set_input(interpreter[2], output2)
-        third_segment_start = time.perf_counter()
-        interpreter[2].invoke()
-        third_segment_time = time.perf_counter() - third_segment_start
-        if third_segment_time > third_max:
-            third_max = third_segment_time
-
-        classes = classify.get_classes(interpreter[2], top_k, threshold)
-        # for c in classes:
-        #     print('%s: %.5f\n' % (labels.get(c.id, c.id), c.score))
-
-        first_time_invoke = time.perf_counter() - first_start
-        if first_time_invoke > max_time_invoke :
-            max_time_invoke = first_time_invoke
+    #     first_time_invoke = time.perf_counter() - first_start
+    #     if first_time_invoke > max_time_invoke :
+    #         max_time_invoke = first_time_invoke
             
         
         
     
     
-    print('max time = {}'.format(max_time_invoke * 1000))
-    print('first segment max = {}'.format(first_max*1000))
-    print('second segment max = {}'.format(second_max*1000))
-    print('third segment max = {}'.format(third_max*1000))
-    print(first_max * 1000 + second_max * 1000 + third_max * 1000)
+    # print('max time = {}'.format(max_time_invoke * 1000))
+    # print('first segment max = {}'.format(first_max*1000))
+    # print('second segment max = {}'.format(second_max*1000))
+    # print('third segment max = {}'.format(third_max*1000))
+    # print(first_max * 1000 + second_max * 1000 + third_max * 1000)
 
     
     ##
