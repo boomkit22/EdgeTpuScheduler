@@ -14,7 +14,7 @@ for line in lines:
     array.append(float(line))
 
 max_value = max(array)
-print(max_value)
+print('max_value = {}'.format(max_value))
     
 x = np.sort(array)
 
@@ -23,9 +23,9 @@ y = 1. * np.arange(len(array)) / (len(array) - 1)
 
 #plot CDF
 ax=plt.axes()
-ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+ax.xaxis.set_major_locator(ticker.MultipleLocator(2))
 ax.yaxis.set_major_locator(ticker.MultipleLocator(0.1))
-plt.xlim(16,40)
+# plt.xlim(32,140)
 plt.rcParams["figure.figsize"] = (15,5)
 
 

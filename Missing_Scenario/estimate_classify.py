@@ -33,6 +33,7 @@ python3 examples/classify_image.py \
 import argparse
 from concurrent.futures import process, thread
 from inspect import ArgSpec
+from re import X
 from sched import scheduler
 from sre_constants import SUCCESS
 import time
@@ -66,12 +67,14 @@ class NamedPipe:
 
     def make_client_pipe(self):
         i = 0
-        client_num = 2
+        client_num = 1
         client_thread_list = []
         # os.system('ls')
         while True:
+            time.sleep(1e-9)
             readmsg = (os.read(self.listenPipe, 100)).decode()
             if readmsg:
+                print(readmsg)
                 i = i + 1
                 pid, modelName = readmsg.split(' ')
                 ServerWritePath = './Pipe/' + 'ServerTo' + str(pid) + '_Pp'
@@ -129,15 +132,15 @@ class Interpreter:
 
     def make_model_path_list(self):
         self.model_path_list = []
-        # model = '/home/hun/WorkSpace/coral/pycoral/models/result/SM_1/efficientnet-edgetpu-L_quant_edgetpu.tflite'
-        # modelName = 'EfficientNet_L'
-        # self.model_path_list.append((modelName, model))
+        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SML_1/efficientnet-edgetpu-L_quant_edgetpu.tflite'
+        modelName = 'EfficientNet_L'
+        self.model_path_list.append((modelName, model))
 
-        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SM_Origin/efficientnet-edgetpu-M_quant_edgetpu.tflite'
+        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SML_1/efficientnet-edgetpu-M_quant_edgetpu.tflite'
         modelName = 'EfficientNet_M'
         self.model_path_list.append((modelName, model))
 
-        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SM_Origin/efficientnet-edgetpu-S_quant_edgetpu.tflite'
+        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SML_1/efficientnet-edgetpu-S_quant_edgetpu.tflite'
         modelName = 'EfficientNet_S'
         self.model_path_list.append((modelName, model))
 
@@ -216,8 +219,10 @@ class Scheduler:
             '/home/hun/WorkSpace/coral/pycoral/test_data/labels.txt')
 
     def schedule(self):
+        L = open('Efficient_L', 'w')
         M = open('Efficient_M', 'w')
         S = open('Efficient_S', 'w')
+        max = 0
         while True:
             time.sleep(1e-9)
             while_start = time.perf_counter()
@@ -245,14 +250,19 @@ class Scheduler:
                 threshold = 0.0
                 top_k = 3
 
+                input_start = time.perf_counter()
                 if common.input_details(assigned_interpreter, 'dtype') != np.uint8:
                     raise ValueError('Only support uint8 input type.')
 
                 size = common.input_size(assigned_interpreter)
 
+                resize_start = time.perf_counter()
+                
                 image = Image.open(imagePath).convert(
                     'RGB').resize(size, Image.ANTIALIAS)
 
+                print('resize time = {}'.format((time.perf_counter() - resize_start) * 1000))
+                
                 params = common.input_details(
                     assigned_interpreter, 'quantization_parameters')
                 scale = params['scales']
@@ -272,10 +282,18 @@ class Scheduler:
                     common.set_input(
                         assigned_interpreter, normalized_input.astype(np.uint8))
 
-                for _ in range(1):
-                    assigned_interpreter.invoke()
-                    classes = classify.get_classes(
+                print( 'input time = {}'.format((time.perf_counter() - input_start)  *  1000 ))
+                
+                
+                invoke_start = time.perf_counter()
+                assigned_interpreter.invoke()
+                # print( 'invoke time = {}'.format((time.perf_counter() - invoke_start)  *  1000 ))
+
+                output_start = time.perf_counter()
+
+                classes = classify.get_classes(
                         assigned_interpreter, top_k, threshold)
+                # print( 'output time = {}'.format((time.perf_counter() - output_start)  *  1000 ))
 
                 msg = ''
                 for c in classes:
@@ -287,14 +305,22 @@ class Scheduler:
                 # while_end = time.perf_counter() - while_start
                 # print(while_end * 1000)
                 
-                if modelName == 'EfficientNet_M':
-                    # print(response_time)
-                    if Scheduler.success + Scheduler.fail < 2000:
+                try_num = 1000
+                if modelName == 'EfficientNet_L':
+                    # print('model Name = {} time {}'.format(modelName,response_time))
+                    if Scheduler.success + Scheduler.fail < try_num:
+                        L.write(str(response_time * 1000) + '\n')
+                    else:
+                        L.close()
+                elif modelName == 'EfficientNet_M':
+                    # print('model Name = {} time {}'.format(modelName,response_time))
+                    if Scheduler.success + Scheduler.fail < try_num:
                         M.write(str(response_time * 1000) + '\n')
                     else:
                         M.close()
                 elif modelName == 'EfficientNet_S':
-                    if Scheduler.success + Scheduler.fail < 2000:
+                    # print('model Name = {} time {}'.format(modelName,response_time))
+                    if Scheduler.success + Scheduler.fail < try_num:
                         S.write(str(response_time * 1000) + '\n')
                     else:
                         S.close()
@@ -309,6 +335,11 @@ class Scheduler:
                 else:
                     Scheduler.fail = Scheduler.fail + 1
 
+                execution_time = time.perf_counter() - while_start
+                if execution_time > max:
+                    max = execution_time
+                print((execution_time) * 1000)
+                print('max = {}'.format(max))
                 # print(tpuInvokeTime * 1000)
              # if preprocessingFlag:
                 #     print('requires preprocessing')
