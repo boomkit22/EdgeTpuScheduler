@@ -50,7 +50,6 @@ import threading
 lock = threading.Lock()
 
 
-
 class NamedPipe:
     request_list = []
     process_dict = {}
@@ -62,15 +61,14 @@ class NamedPipe:
         if os.path.exists(self.path):
             os.remove(self.path)
         os.mkfifo(self.path)
-        
+
         self.listenPipe = os.open(self.path, os.O_RDONLY)
-
-
 
     def make_client_pipe(self):
         i = 0
         client_num = 2
-        os.system('ls')
+        client_thread_list = []
+        # os.system('ls')
         while True:
             readmsg = (os.read(self.listenPipe, 100)).decode()
             if readmsg:
@@ -84,11 +82,11 @@ class NamedPipe:
                 if os.path.exists(ClientWritePath):
                     os.remove(ClientWritePath)
                 os.mkfifo(ClientWritePath)
-                ReadWritePipe = threading.Thread(target=self.read_and_write_to_queue, args=(
-                    pid, modelName, ServerWritePath, ClientWritePath))
-                ReadWritePipe.start()
+                client_thread_list.append(threading.Thread(target=self.read_and_write_to_queue, args=(
+                    pid, modelName, ServerWritePath, ClientWritePath)))
                 if i == client_num:
-                    print('full client')
+                    for thread in client_thread_list:
+                        thread.start()
                     break
 
     def read_and_write_to_queue(self, pid, model_name, server_write_path, client_write_path):
@@ -96,6 +94,10 @@ class NamedPipe:
         from_client = os.open(client_write_path, os.O_RDONLY)
         pid = int(pid)
         NamedPipe.process_dict[pid] = (model_name, to_client)
+        
+        init_msg = 'complete'.encode()
+        os.write(to_client ,init_msg)
+        
         while True:
             msg = os.read(from_client, 100).decode()
             if msg:
@@ -107,17 +109,17 @@ class NamedPipe:
                 period = float(period)
                 request_time = float(request_time)
                 lock.acquire()
-                NamedPipe.request_list.append((pid, image_path, request_time, period))
+                # print('pid = {} now = {}'.format(pid,time.perf_counter() * 1000))
+                NamedPipe.request_list.append(
+                    (pid, image_path, request_time, period))
                 lock.release()
 
     def run(self):
         self.make_listen_pipe()
-        self.listen_thread = threading.Thread(target=self.make_client_pipe, args=())
+        self.listen_thread = threading.Thread(
+            target=self.make_client_pipe, args=())
         self.listen_thread.start()
         # self.listen_thread.join()
-
-
-
 
 
 class Interpreter:
@@ -146,48 +148,77 @@ class Interpreter:
     def initialize_dict(self):
         self.make_model_path_list()
         for model in self.model_path_list:
-            print(model[1])
             Interpreter = make_interpreter(model[1])
             Interpreter.allocate_tensors()
             self.model_interpreter_dict[model[0]] = Interpreter
 
+    def initialize_model(self):
+        imagePath = './imageDir/n0153282900000005.jpg'
+
+        for model in self.model_interpreter_dict.values():
+            size = common.input_size(model)
+            image = Image.open(imagePath).convert(
+                'RGB').resize(size, Image.ANTIALIAS)
+
+            params = common.input_details(
+                model, 'quantization_parameters')
+            scale = params['scales']
+            zero_point = params['zero_points']
+            mean = 128.0
+            std = 128.0
+
+            if abs(scale * std - 1) < 1e-5 and abs(mean - zero_point) < 1e-5:
+                # Input data does not require preprocessing.
+                common.set_input(model, image)
+            else:
+                # Input data requires preprocessing
+                normalized_input = (np.asarray(image) - mean) / \
+                    (std * scale) + zero_point
+                np.clip(normalized_input, 0, 255, out=normalized_input)
+                common.set_input(
+                    model, normalized_input.astype(np.uint8))
+
+            model.invoke()
+ 
+
+
+            
 
 
 class Analyzer:
-    def __init__(self,Scheduler):
+    def __init__(self, Scheduler):
         self.scheduler = Scheduler
         self.prev_request_num = 0
         self.request_num = 0
         self.request_per_sec = 0
+
     def CountRequest(self):
         while True:
             self.request_num = Scheduler.success + Scheduler.fail
             self.request_per_sec = self.request_num - self.prev_request_num
             self.prev_request_num = self.request_num
             print('SUCCESS : {} FAIL : {}  ReqPerSec : {}'.format(Scheduler.success,
-            Scheduler.fail,self.request_per_sec))
+                                                                  Scheduler.fail, self.request_per_sec))
             time.sleep(1)
 
     def run(self):
-        analyzer_thread = threading.Thread(target = self.CountRequest, args = ())
+        analyzer_thread = threading.Thread(target=self.CountRequest, args=())
         analyzer_thread.start()
-
-
 
 
 class Scheduler:
     success = 0
     fail = 0
 
-    def __init__(self,Interpreter):
+    def __init__(self, Interpreter):
         self.interpreter = Interpreter
-        self.labels = read_label_file('/home/hun/WorkSpace/coral/pycoral/test_data/labels.txt')
-
+        self.labels = read_label_file(
+            '/home/hun/WorkSpace/coral/pycoral/test_data/labels.txt')
 
     def schedule(self):
-         M = open('Efficient_M','w')
-         S = open('Efficient_S','w')
-         while True:
+        M = open('Efficient_M', 'w')
+        S = open('Efficient_S', 'w')
+        while True:
             time.sleep(1e-9)
             while_start = time.perf_counter()
             if len(NamedPipe.request_list) != 0:
@@ -214,8 +245,6 @@ class Scheduler:
                 threshold = 0.0
                 top_k = 3
 
-
-
                 if common.input_details(assigned_interpreter, 'dtype') != np.uint8:
                     raise ValueError('Only support uint8 input type.')
 
@@ -232,7 +261,6 @@ class Scheduler:
                 mean = 128.0
                 std = 128.0
 
-
                 if abs(scale * std - 1) < 1e-5 and abs(mean - zero_point) < 1e-5:
                     # Input data does not require preprocessing.
                     common.set_input(assigned_interpreter, image)
@@ -246,29 +274,30 @@ class Scheduler:
 
                 for _ in range(1):
                     assigned_interpreter.invoke()
-                    classes = classify.get_classes(assigned_interpreter, top_k, threshold)
+                    classes = classify.get_classes(
+                        assigned_interpreter, top_k, threshold)
 
                 msg = ''
                 for c in classes:
-
-                    msg = msg + ('%s: %.5f\n' % (self.labels.get(c.id, c.id), c.score))
+                    msg = msg + ('%s: %.5f\n' %
+                                 (self.labels.get(c.id, c.id), c.score))
 
                 os.write(ToClient, msg.encode())
                 response_time = time.perf_counter() - request_time
                 # while_end = time.perf_counter() - while_start
                 # print(while_end * 1000)
+                
                 if modelName == 'EfficientNet_M':
-                    print(response_time)
-                    if Scheduler.success + Scheduler.fail < 10000:
+                    # print(response_time)
+                    if Scheduler.success + Scheduler.fail < 2000:
                         M.write(str(response_time * 1000) + '\n')
                     else:
                         M.close()
                 elif modelName == 'EfficientNet_S':
-                    if Scheduler.success + Scheduler.fail < 10000:
+                    if Scheduler.success + Scheduler.fail < 2000:
                         S.write(str(response_time * 1000) + '\n')
                     else:
                         S.close()
-
 
                 # print('model = {} rp_time = {}'.format(modelName,response_time * 1000))
 
@@ -279,7 +308,6 @@ class Scheduler:
                     Scheduler.success = Scheduler.success+1
                 else:
                     Scheduler.fail = Scheduler.fail + 1
-
 
                 # print(tpuInvokeTime * 1000)
              # if preprocessingFlag:
@@ -302,28 +330,23 @@ class Scheduler:
                 #                                     - tpuInvokeTime - setInputTime)*1000))
 
     def run(self):
-        self.schedule_thread  = threading.Thread(target=self.schedule, args=())
+        self.schedule_thread = threading.Thread(target=self.schedule, args=())
         self.schedule_thread.start()
         # self.schedule_thread.join()
-
-
 
 
 if __name__ == '__main__':
     os.system('rm ./Pipe/*')
 
-    named_pipe = NamedPipe()
-    named_pipe.run()
-
-
-
     interpreter = Interpreter()
     interpreter.initialize_dict()
+    interpreter.initialize_model()
+
+    named_pipe = NamedPipe()
+    named_pipe.run()
 
     scheduler = Scheduler(interpreter)
     scheduler.run()
 
     analyzer = Analyzer(scheduler)
     analyzer.run()
-
-
