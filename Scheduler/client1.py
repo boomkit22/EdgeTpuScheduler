@@ -61,6 +61,7 @@ def Write():
             request_time = time.perf_counter()
             args = '{} {} {} {} {}'.format(str(pid), img, str(request_time),str(period), str(segment_num)).encode()
             os.write(ToServer, args)
+            print(time.perf_counter())
             num = num + 1
             iter = iter + 1
 
@@ -89,9 +90,3 @@ if __name__ == '__main__':
 
     th_Write.join()
     th_Read.join()
-
-    #os.system('rm ./Pipe/*')
-    # listenProcess = Process(target=Listen, args=())
-    # scheduler = Process(target=ScheduleAndRun, args=())
-    # th_Write.start()
-    # th_Read.start()

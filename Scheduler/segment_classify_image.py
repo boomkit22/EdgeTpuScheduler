@@ -75,7 +75,6 @@ class NamedPipe:
         while True:
             readmsg = (os.read(self.listenPipe, 100)).decode()
             if readmsg:
-
                 i = i+1
                 pid, modelName = readmsg.split(' ')
                 ServerWritePath = './Pipe/' + 'ServerTo' + str(pid) + '_Pp'
@@ -111,6 +110,7 @@ class NamedPipe:
                 pid = int(pid)
                 period = float(period)
                 request_time = float(request_time)
+                segment_num = int(segment_num)
 
                 # 지금 들어온 request가 현재 실행중인 task의 segment보다 priority가 높으면
                 # preempt_flag를 True로
@@ -118,15 +118,12 @@ class NamedPipe:
 
                 preempt_lock.acquire()
                 priority = 1/period
-
                 if priority > NamedPipe.current_task["priority"] and NamedPipe.current_task["priority"] != 0:
                     NamedPipe.preempt_flag = True
                 else:
                     NamedPipe.preempt_flag = False
-
                 preempt_lock.release()
 
-                segment_num = int(segment_num)
 
                 lock.acquire()
                 NamedPipe.request_list.append(
@@ -174,6 +171,7 @@ class Interpreter:
         model_name = 'MobileNet_V1'
         self.model_path_dict[model_name] = [model_segment1, model_segment2, model_segment3]
 
+
     def initialize_model_dict(self):
         self.make_model_path_list()
         for model_name in self.model_path_dict:
@@ -199,7 +197,7 @@ class Analyzer:
             self.prev_request_num = self.request_num
 
             print('O : {} X : {} in Queue: {} ReqPerSec : {}'.format(Scheduler.success,
-                                                                     Scheduler.fail, len(NamedPipe.request_list), self.request_per_sec))
+                  Scheduler.fail, len(NamedPipe.request_list), self.request_per_sec))
 
             time.sleep(1)
 
@@ -282,7 +280,6 @@ class Scheduler:
                 for i in range(len(NamedPipe.request_list)):
                     task_priority = 1 / NamedPipe.request_list[i][3]
                     # print('task_priority = {}, segment_max_priority = {}'.format(task_priority, segment_max_priority))
-
                     if task_priority > segment_max_priority:
                         execute_segment_flag = False
                         execute_request_flag = True
@@ -303,8 +300,7 @@ class Scheduler:
             # intermediate_output에 저장되어있는 segment를 실행해야 한다
             if execute_segment_flag:
                 # 있으면 priority 제일 높은 segment부터 실행
-                self.intermediate_output.sort(
-                    key=lambda x: x["priority"], reverse=True)
+                self.intermediate_output.sort(key=lambda x: x["priority"], reverse=True)
                 next_task = self.intermediate_output.pop(0)
                 to_client = next_task["to_client"]
                 self.prev_output = next_task["intermediate_output"]

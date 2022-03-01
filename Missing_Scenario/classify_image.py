@@ -62,11 +62,15 @@ class NamedPipe:
         if os.path.exists(self.path):
             os.remove(self.path)
         os.mkfifo(self.path)
+        
         self.listenPipe = os.open(self.path, os.O_RDONLY)
+
+
 
     def make_client_pipe(self):
         i = 0
         client_num = 2
+        os.system('ls')
         while True:
             readmsg = (os.read(self.listenPipe, 100)).decode()
             if readmsg:
@@ -85,7 +89,7 @@ class NamedPipe:
                 ReadWritePipe.start()
                 if i == client_num:
                     print('full client')
-                    break   
+                    break
 
     def read_and_write_to_queue(self, pid, model_name, server_write_path, client_write_path):
         to_client = os.open(server_write_path, os.O_WRONLY)
@@ -120,25 +124,25 @@ class Interpreter:
     def __init__(self):
         self.model_interpreter_dict = {}
         self.model_path_list = []
-        
+
     def make_model_path_list(self):
         self.model_path_list = []
         # model = '/home/hun/WorkSpace/coral/pycoral/models/result/SM_1/efficientnet-edgetpu-L_quant_edgetpu.tflite'
         # modelName = 'EfficientNet_L'
         # self.model_path_list.append((modelName, model))
 
-        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SM_1/efficientnet-edgetpu-M_quant_edgetpu.tflite'
+        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SM_Origin/efficientnet-edgetpu-M_quant_edgetpu.tflite'
         modelName = 'EfficientNet_M'
         self.model_path_list.append((modelName, model))
 
-        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SM_1/efficientnet-edgetpu-S_quant_edgetpu.tflite'
+        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SM_Origin/efficientnet-edgetpu-S_quant_edgetpu.tflite'
         modelName = 'EfficientNet_S'
         self.model_path_list.append((modelName, model))
 
         # model = '/home/hun/WorkSpace/coral/pycoral/models/result/SM_1/mobilenet_v1_0.25_128_quant_edgetpu.tflite'
         # modelName = 'MobileNet_V1'
         # self.model_path_list.append((modelName, model))
-    
+
     def initialize_dict(self):
         self.make_model_path_list()
         for model in self.model_path_list:
@@ -146,8 +150,8 @@ class Interpreter:
             Interpreter = make_interpreter(model[1])
             Interpreter.allocate_tensors()
             self.model_interpreter_dict[model[0]] = Interpreter
-        
-        
+
+
 
 class Analyzer:
     def __init__(self,Scheduler):
@@ -163,23 +167,23 @@ class Analyzer:
             print('SUCCESS : {} FAIL : {}  ReqPerSec : {}'.format(Scheduler.success,
             Scheduler.fail,self.request_per_sec))
             time.sleep(1)
-            
+
     def run(self):
         analyzer_thread = threading.Thread(target = self.CountRequest, args = ())
         analyzer_thread.start()
-        
 
-        
-    
+
+
+
 class Scheduler:
     success = 0
     fail = 0
 
     def __init__(self,Interpreter):
-        self.interpreter = Interpreter  
-        self.labels = read_label_file('/home/hun/WorkSpace/coral/pycoral/test_data/labels.txt')  
+        self.interpreter = Interpreter
+        self.labels = read_label_file('/home/hun/WorkSpace/coral/pycoral/test_data/labels.txt')
 
-    
+
     def schedule(self):
          M = open('Efficient_M','w')
          S = open('Efficient_S','w')
@@ -254,12 +258,13 @@ class Scheduler:
                 # while_end = time.perf_counter() - while_start
                 # print(while_end * 1000)
                 if modelName == 'EfficientNet_M':
-                    if Scheduler.success + Scheduler.fail < 2500:
+                    print(response_time)
+                    if Scheduler.success + Scheduler.fail < 10000:
                         M.write(str(response_time * 1000) + '\n')
                     else:
                         M.close()
                 elif modelName == 'EfficientNet_S':
-                    if Scheduler.success + Scheduler.fail < 2500:
+                    if Scheduler.success + Scheduler.fail < 10000:
                         S.write(str(response_time * 1000) + '\n')
                     else:
                         S.close()
@@ -270,21 +275,21 @@ class Scheduler:
                 if time.perf_counter() - request_time < deadline:
                     # print((time.perf_counter() - request_time) * 1000)
                     # print('loop time = {:.3f}ms'.format(
-                    # (time.perf_counter() - loopStartTime)*1000))               
+                    # (time.perf_counter() - loopStartTime)*1000))
                     Scheduler.success = Scheduler.success+1
                 else:
                     Scheduler.fail = Scheduler.fail + 1
-                    
-                
+
+
                 # print(tpuInvokeTime * 1000)
              # if preprocessingFlag:
                 #     print('requires preprocessing')
                 # else:
                 #     print('non preprocessing')
-              
+
                 # print('setInputTime = {:.3f}ms'.format((setInputTime)*1000))
                 # print('getClassesTime = {:.3f}ms'.format((getClassesTime)*1000))
-                
+
                 # print('loop time = {:.3f}ms'.format(
                 #     (time.perf_counter() - loopStartTime)*1000))
                 # # print('schedulingOverheadTime = {:.3f}ms'.format(
@@ -295,19 +300,22 @@ class Scheduler:
                 #     (setInputTime + getClassesTime)*1000))
                 # print('remain time = {:.3f}ms'.format((time.perf_counter() - loopStartTime - schedulingOverheadTime - imageResizeTime
                 #                                     - tpuInvokeTime - setInputTime)*1000))
-                
+
     def run(self):
         self.schedule_thread  = threading.Thread(target=self.schedule, args=())
         self.schedule_thread.start()
         # self.schedule_thread.join()
-        
+
 
 
 
 if __name__ == '__main__':
     os.system('rm ./Pipe/*')
+
     named_pipe = NamedPipe()
     named_pipe.run()
+
+
 
     interpreter = Interpreter()
     interpreter.initialize_dict()
@@ -317,5 +325,5 @@ if __name__ == '__main__':
 
     analyzer = Analyzer(scheduler)
     analyzer.run()
-    
+
 
