@@ -32,6 +32,7 @@ python3 examples/classify_image.py \
 
 import argparse
 from concurrent.futures import process, thread
+from ctypes import resize
 from inspect import ArgSpec
 from sched import scheduler
 from sre_constants import SUCCESS
@@ -97,10 +98,10 @@ class NamedPipe:
         from_client = os.open(client_write_path, os.O_RDONLY)
         pid = int(pid)
         NamedPipe.process_dict[pid] = (model_name, to_client)
-        
+
         init_msg = 'complete'.encode()
         os.write(to_client ,init_msg)
-        
+
         while True:
             msg = os.read(from_client, 100).decode()
             if msg:
@@ -182,10 +183,10 @@ class Interpreter:
                     model, normalized_input.astype(np.uint8))
 
             model.invoke()
- 
 
 
-            
+
+
 
 
 class Analyzer:
@@ -213,10 +214,31 @@ class Scheduler:
     success = 0
     fail = 0
 
+
     def __init__(self, Interpreter):
         self.interpreter = Interpreter
         self.labels = read_label_file(
             '/home/hun/WorkSpace/coral/pycoral/test_data/labels.txt')
+
+        
+        self.image_L = self.openimage( (300,300),  0.01245984 , 129)  # size, scale, zeropoint
+        self.image_M = self.openimage( (240,240),  0.01208907 , 129)
+        self.image_S = self.openimage( (224,224),  0.01256602 , 131)
+    
+                
+    def openimage(self, size, scale, zero_point):
+        mean = 128.0
+        std = 128.0
+        image = Image.open('./imageDir/n0153282900000036.jpg').convert('RGB').resize(size,Image.ANTIALIAS)
+        normalized_input = (np.asarray(image) - mean) / \
+            (std * scale) + zero_point
+        np.clip(normalized_input, 0 , 255 , out = normalized_input )
+        return_value = np.array(normalized_input.astype(np.uint8))[np.newaxis,:]
+        
+        return return_value
+        
+        
+        
 
     def schedule(self):
         L = open('Efficient_L', 'w')
@@ -224,14 +246,14 @@ class Scheduler:
         S = open('Efficient_S', 'w')
         while True:
             time.sleep(1e-9)
-            while_start = time.perf_counter()
+            # while_start = time.perf_counter()
             if len(NamedPipe.request_list) != 0:
                 # print(len(request_list))
                 ##FIFO##
-                
-                lock_start = time.perf_counter()
+
+                # lock_start = time.perf_counter()
                 lock.acquire()
-                
+
                 NamedPipe.request_list.sort(key=lambda request: request[3])
                 who = NamedPipe.request_list.pop(0)
 
@@ -254,69 +276,59 @@ class Scheduler:
                 threshold = 0.0
                 top_k = 3
 
-                input_start = time.perf_counter()
-                if common.input_details(assigned_interpreter, 'dtype') != np.uint8:
-                    raise ValueError('Only support uint8 input type.')
+                # input_start = time.perf_counter()
+
 
                 size = common.input_size(assigned_interpreter)
 
-                print(size)
-                resize_start = time.perf_counter()
-                image = Image.open(imagePath).convert(
-                    'RGB').resize(size, Image.ANTIALIAS)
-                
-                if modelName == 'EfficientNet_S':
-                        print( 'resize time = {}'.format((time.perf_counter() - resize_start)  *  1000 ))
+
+
+
+                if modelName == 'EfficientNet_L':
+                    image = self.image_L
+                elif modelName == 'EfficientNet_M':
+                    image = self.image_M
+                elif modelName == 'EfficientNet_S':
+                    image = self.image_S
+
+
+                # input_start = time.perf_counter()
 
                 params = common.input_details(
                     assigned_interpreter, 'quantization_parameters')
                 scale = params['scales']
                 zero_point = params['zero_points']
 
+
+                    
+                assigned_interpreter.set_tensor(0,image)
+
+
                 mean = 128.0
                 std = 128.0
 
-                if abs(scale * std - 1) < 1e-5 and abs(mean - zero_point) < 1e-5:
-                    # Input data does not require preprocessing.
-                    common.set_input(assigned_interpreter, image)
-                else:
-                    # Input data requires preprocessing
-                    normalized_input = (np.asarray(image) - mean) / \
-                        (std * scale) + zero_point
-                    np.clip(normalized_input, 0, 255, out=normalized_input)
-                    common.set_input(
-                        assigned_interpreter, normalized_input.astype(np.uint8))
+                # invoke_start = time.perf_counter()
 
-                print(modelName)
-
-
-                
-                invoke_start = time.perf_counter()
-                
                 assigned_interpreter.invoke()
                 # print( 'invoke time = {}'.format((time.perf_counter() - invoke_start)  *  1000 ))
-                
+
                 classes = classify.get_classes(
                         assigned_interpreter, top_k, threshold)
-                output_start = time.perf_counter()
+                # output_start = time.perf_counter()
                 # print( 'output time = {}'.format((time.perf_counter() - output_start)  *  1000 ))
-                
-                
+
+
                 msg = ''
                 for c in classes:
                     msg = msg + ('%s: %.5f\n' %
                                  (self.labels.get(c.id, c.id), c.score))
 
+
+
                 os.write(ToClient, msg.encode())
                 response_time = time.perf_counter() - request_time
-                # while_end = time.perf_counter() - while_start
-                # print(while_end * 1000)
-               
 
-                
-                
-                
-                my_start = time.perf_counter()
+
                 try_num = 1000
                 if modelName == 'EfficientNet_L':
                     # print('model Name = {} time {}'.format(modelName,response_time))
@@ -348,9 +360,8 @@ class Scheduler:
                     Scheduler.fail = Scheduler.fail + 1
 
                 # print('model = {} loop time = {}'.format(modelName, (time.perf_counter() - while_start) * 1000))
-                
-                # print( 'my time = {}'.format((time.perf_counter() - my_start)  *  1000 ))
-                
+
+
                 # print(tpuoutput_startInvokeTime * 1000)
              # if preprocessingFlag:
                 #     print('requires preprocessing')
@@ -385,10 +396,9 @@ if __name__ == '__main__':
     interpreter.initialize_model()
 
     named_pipe = NamedPipe()
-    named_pipe.run()
-
     scheduler = Scheduler(interpreter)
-    scheduler.run()
-
     analyzer = Analyzer(scheduler)
+
+    named_pipe.run()
+    scheduler.run()
     analyzer.run()

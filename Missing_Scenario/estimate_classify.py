@@ -299,6 +299,8 @@ class Scheduler:
                 for c in classes:
                     msg = msg + ('%s: %.5f\n' %
                                  (self.labels.get(c.id, c.id), c.score))
+                    
+                print(msg)
 
                 os.write(ToClient, msg.encode())
                 response_time = time.perf_counter() - request_time
