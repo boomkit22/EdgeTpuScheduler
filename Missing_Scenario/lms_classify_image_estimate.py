@@ -185,10 +185,6 @@ class Interpreter:
             model.invoke()
 
 
-
-
-
-
 class Analyzer:
     def __init__(self, Scheduler):
         self.scheduler = Scheduler
@@ -244,9 +240,13 @@ class Scheduler:
         L = open('Efficient_L', 'w')
         M = open('Efficient_M', 'w')
         S = open('Efficient_S', 'w')
+        max_L = 0
+        max_M = 0
+        max_S = 0
+        
         while True:
             time.sleep(1e-9)
-            # while_start = time.perf_counter()
+            while_start = time.perf_counter()
             if len(NamedPipe.request_list) != 0:
                 # print(len(request_list))
                 ##FIFO##
@@ -328,29 +328,63 @@ class Scheduler:
                 os.write(ToClient, msg.encode())
                 response_time = time.perf_counter() - request_time
 
-
-                try_num = 1000
+                while_end = (time.perf_counter() - while_start) * 1000
+                
+                try_num = 10000
                 if modelName == 'EfficientNet_L':
                     # print('model Name = {} time {}'.format(modelName,response_time))
                     if Scheduler.success + Scheduler.fail < try_num:
                         L.write(str(response_time * 1000) + '\n')
+                        
+              
+                        # print('re = {}'.format(response_time * 1000))
+                        # print('while = {}'.format(while_end))
+                        
+                        
+                        # time_L = response_time * 1000
+                        # if time_L > max_L : 
+                            # max_L = time_L
+                        # print('{}, {}'.format(modelName,maxL_L))
+                        
+                        
                     else:
                         L.close()
                 elif modelName == 'EfficientNet_M':
                     # print('model Name = {} time {}'.format(modelName,response_time))
                     if Scheduler.success + Scheduler.fail < try_num:
                         M.write(str(response_time * 1000) + '\n')
+                       
+                        # print(response_time * 1000)
+                        
+                        
+                        # time_M = response_time * 1000
+                        # if time_M > max_M : 
+                            # max_M = time_M
+                        # print('{}, {}'.format(modelName,max_M))
+                        
                     else:
                         M.close()
                 elif modelName == 'EfficientNet_S':
                     # print('model Name = {} time {}'.format(modelName,response_time))
                     if Scheduler.success + Scheduler.fail < try_num:
                         S.write(str(response_time * 1000) + '\n')
+              
+                        # print(response_time * 1000)
+                        
+                        
+                        
+                        # time_S = response_time * 1000
+                        # if time_S > max_S : 
+                        #     max_S = time_S
+                        # print('{}, {}'.format(modelName,max_S))
+                        
+                        
                     else:
                         S.close()
 
                 # print('model = {} rp_time = {}'.format(modelName,response_time * 1000))
 
+                # print((time.perf_counter() - request_time) * 1000)
                 if time.perf_counter() - request_time < deadline:
                     # print((time.perf_counter() - request_time) * 1000)
                     # print('loop time = {:.3f}ms'.format(

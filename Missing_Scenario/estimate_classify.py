@@ -132,15 +132,15 @@ class Interpreter:
 
     def make_model_path_list(self):
         self.model_path_list = []
-        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SML_1/efficientnet-edgetpu-L_quant_edgetpu.tflite'
+        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SML_Origin/efficientnet-edgetpu-L_quant_edgetpu.tflite'
         modelName = 'EfficientNet_L'
         self.model_path_list.append((modelName, model))
 
-        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SML_1/efficientnet-edgetpu-M_quant_edgetpu.tflite'
+        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SML_Origin/efficientnet-edgetpu-M_quant_edgetpu.tflite'
         modelName = 'EfficientNet_M'
         self.model_path_list.append((modelName, model))
 
-        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SML_1/efficientnet-edgetpu-S_quant_edgetpu.tflite'
+        model = '/home/hun/WorkSpace/coral/pycoral/models/result/SML_Origin/efficientnet-edgetpu-S_quant_edgetpu.tflite'
         modelName = 'EfficientNet_S'
         self.model_path_list.append((modelName, model))
 
@@ -222,6 +222,7 @@ class Scheduler:
         L = open('Efficient_L', 'w')
         M = open('Efficient_M', 'w')
         S = open('Efficient_S', 'w')
+        
         max = 0
         while True:
             time.sleep(1e-9)
@@ -300,24 +301,28 @@ class Scheduler:
                     msg = msg + ('%s: %.5f\n' %
                                  (self.labels.get(c.id, c.id), c.score))
                     
-                print(msg)
+                # print(msg)
 
                 os.write(ToClient, msg.encode())
                 response_time = time.perf_counter() - request_time
-                # while_end = time.perf_counter() - while_start
+                while_end = time.perf_counter() - while_start
                 # print(while_end * 1000)
                 
-                try_num = 1000
+                try_num = 10000
                 if modelName == 'EfficientNet_L':
                     # print('model Name = {} time {}'.format(modelName,response_time))
                     if Scheduler.success + Scheduler.fail < try_num:
                         L.write(str(response_time * 1000) + '\n')
+                        print('re = {}'.format(response_time * 1000))
+                        print('while = {}'.format(while_end))
+                        
                     else:
                         L.close()
                 elif modelName == 'EfficientNet_M':
                     # print('model Name = {} time {}'.format(modelName,response_time))
                     if Scheduler.success + Scheduler.fail < try_num:
                         M.write(str(response_time * 1000) + '\n')
+                        
                     else:
                         M.close()
                 elif modelName == 'EfficientNet_S':
@@ -340,8 +345,8 @@ class Scheduler:
                 execution_time = time.perf_counter() - while_start
                 if execution_time > max:
                     max = execution_time
-                print((execution_time) * 1000)
-                print('max = {}'.format(max))
+                # print((execution_time) * 1000)
+                # print('max = {}'.format(max))
                 # print(tpuInvokeTime * 1000)
              # if preprocessingFlag:
                 #     print('requires preprocessing')

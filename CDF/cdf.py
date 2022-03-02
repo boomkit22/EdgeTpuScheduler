@@ -23,7 +23,7 @@ y = 1. * np.arange(len(array)) / (len(array) - 1)
 
 #plot CDF
 ax=plt.axes()
-ax.xaxis.set_major_locator(ticker.MultipleLocator(2))
+# ax.xaxis.set_major_locator(ticker.MultipleLocator(2))
 ax.yaxis.set_major_locator(ticker.MultipleLocator(0.1))
 # plt.xlim(32,140)
 plt.rcParams["figure.figsize"] = (15,5)

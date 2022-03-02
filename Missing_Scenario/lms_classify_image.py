@@ -325,8 +325,9 @@ class Scheduler:
                     Scheduler.fail = Scheduler.fail + 1
 
                 print('model = {} loop time = {}'.format(modelName, (time.perf_counter() - while_start) * 1000))
+                
                 # print(tpuInvokeTime * 1000)
-             # if preprocessingFlag:
+                # if preprocessingFlag:
                 #     print('requires preprocessing')
                 # else:
                 #     print('non preprocessing')

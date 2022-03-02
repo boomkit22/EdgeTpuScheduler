@@ -94,12 +94,15 @@ def ClientProcess(model_name, period):
     th_Read.start()
     th_Read.join()
     
+# 0.4
+# 0.32
+# 0.08
     
 # model = 'EfficientNet_M'
 if __name__ == '__main__':
-     EFNet_L = Process(target=ClientProcess, args=('EfficientNet_L',0.6))
-     EFNet_M = Process(target=ClientProcess, args=('EfficientNet_M',0.6))
-     EFNet_S = Process(target=ClientProcess, args =('EfficientNet_S',0.12))
+     EFNet_L = Process(target=ClientProcess, args=('EfficientNet_L',0.4))
+     EFNet_M = Process(target=ClientProcess, args=('EfficientNet_M',0.3))
+     EFNet_S = Process(target=ClientProcess, args =('EfficientNet_S',0.02))
      EFNet_L.start()
      time.sleep(1e-1)
      EFNet_M.start()
