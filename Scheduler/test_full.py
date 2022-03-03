@@ -52,10 +52,7 @@ def main():
         # self.model_path_dict[modelName] = [model_1, model_2, model_3]
         
 
-    model_paths = ['/home/hun/WorkSpace/coral/pycoral/model/co_segment/Efficient_L/efficientnet-edgetpu-L_quant_segment_0_of_3_edgetpu.tflite',
-                   '/home/hun/WorkSpace/coral/pycoral/model/co_segment/Efficient_L/efficientnet-edgetpu-L_quant_segment_1_of_3_edgetpu.tflite', 
-                   '/home/hun/WorkSpace/coral/pycoral/model/co_segment/Efficient_L/efficientnet-edgetpu-L_quant_segment_2_of_3_edgetpu.tflite']
-
+    model_paths = ['/home/hun/WorkSpace/coral/pycoral/models/result/SML_Origin/efficientnet-edgetpu-L_quant_edgetpu.tflite']
     interpreter = _make_runner(model_paths)
 
     # function interpreters()   """Returns list of interpreters that constructed PipelinedModelRunner."""
@@ -87,14 +84,12 @@ def main():
 
         return return_value
     
-    image = openimage((300,300) , 0.01245984, 129)      # L
     
-    # image = openimage((240, 240),  0.01208907, 129)   # M
-    
-    # image = openimage((224,224),0.01256602,131)       # S
+    image = openimage((300,300),  0.01208907, 129)
+    # image = openimage((224,224),0.01256602,131)
     
     print(interpreter[0].get_input_details())
-    interpreter[0].set_tensor(1,image)
+    interpreter[0].set_tensor(0,image)
     
     # print('image size = {}'.format(image_size))
     # image = np.array(
@@ -140,46 +135,18 @@ def main():
 
 
     while True:
-        intermediate_output = {}
+        invoke_start =time.perf_counter()
         time.sleep(1e-6)
-        invoke_start = time.perf_counter()
-        interpreter[0].set_tensor(1,image)
+        interpreter[0].set_tensor(0,image)
         interpreter[0].invoke()
-        # interpreter[0].set_tensor(0, normalized_input.astype(np.uint8))
-        # print(intermediate_output)
-        # print('-----------------------------')
-        # print(interpreter[1].get_input_details())
-        
-        for output_detail in interpreter[0].get_output_details():
-            intermediate_output[output_detail['name']] = interpreter[0].get_tensor(output_detail['index'])
-
-        for input_detail in interpreter[1].get_input_details():
-            for key,value in intermediate_output.items():
-                if key == input_detail['name']:
-                    tensor_index = input_detail['index']
-                    interpreter[1].set_tensor(tensor_index, value)
-
-    
-        interpreter[1].invoke()
-        for output_detail in interpreter[1].get_output_details():
-            intermediate_output[output_detail['name']] = interpreter[1].get_tensor(output_detail['index'])
-
-    
-        for input_detail in interpreter[2].get_input_details():
-            for key,value in intermediate_output.items():
-                if key == input_detail['name']:
-                    tensor_index = input_detail['index']
-                    interpreter[2].set_tensor(tensor_index, value)
-
-
-        interpreter[2].invoke()
-        classes = classify.get_classes(interpreter[2], 1, 0.0)
+        classes = classify.get_classes(interpreter[0], 1, 0.0)
 
         for c in classes:
             print('%s: %.5f\n' % (labels.get(c.id, c.id), c.score))
         
         invoke_end = (time.perf_counter()- invoke_start) * 1000
         print(str(invoke_end) + "ms")
+      
  
 
     # output = interpreter[0].get_tensor(0)

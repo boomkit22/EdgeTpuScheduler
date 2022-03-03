@@ -291,15 +291,6 @@ class Scheduler:
                 elif modelName == 'EfficientNet_S':
                     image = self.image_S
 
-
-                # input_start = time.perf_counter()
-
-                params = common.input_details(
-                    assigned_interpreter, 'quantization_parameters')
-                scale = params['scales']
-                zero_point = params['zero_points']
-
-
                     
                 assigned_interpreter.set_tensor(0,image)
 

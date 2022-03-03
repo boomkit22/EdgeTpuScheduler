@@ -6,7 +6,7 @@ import matplotlib.ticker as ticker
 from sympy import Max
 
 
-f = open('../Missing_Scenario/Efficient_S', 'r')
+f = open('../Segment_Scheduler/Efficient_S', 'r')
 lines = f.readlines()
 array = []
 print()

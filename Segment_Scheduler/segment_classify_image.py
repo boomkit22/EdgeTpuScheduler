@@ -71,7 +71,8 @@ class NamedPipe:
 
     def make_client_pipe(self):
         i = 0
-        client_num = 4
+        client_num = 3
+        client_thread_list = []
         while True:
             readmsg = (os.read(self.listenPipe, 100)).decode()
             if readmsg:
@@ -85,10 +86,11 @@ class NamedPipe:
                 if os.path.exists(ClientWritePath):
                     os.remove(ClientWritePath)
                 os.mkfifo(ClientWritePath)
-                ReadWritePipe = threading.Thread(target=self.read_and_write_to_queue, args=(
-                    pid, modelName, ServerWritePath, ClientWritePath))
-                ReadWritePipe.start()
+                client_thread_list.append(threading.Thread(target=self.read_and_write_to_queue, args=(
+                    pid, modelName, ServerWritePath, ClientWritePath)))
                 if i == client_num:
+                    for thread in client_thread_list:
+                        thread.start()
                     break
 
     # @profile
@@ -98,6 +100,11 @@ class NamedPipe:
         from_client = os.open(client_write_path, os.O_RDONLY)
         pid = int(pid)
         NamedPipe.process_dict[pid] = (model_name, to_client)
+        
+        
+        init_msg = 'complete'.encode()
+        os.write(to_client ,init_msg)
+
         while True:
             msg = os.read(from_client, 100).decode()
             if msg:
@@ -107,6 +114,7 @@ class NamedPipe:
                 except(ValueError):
                     print(msg)
 
+                
                 pid = int(pid)
                 period = float(period)
                 request_time = float(request_time)
@@ -123,7 +131,6 @@ class NamedPipe:
                 else:
                     NamedPipe.preempt_flag = False
                 preempt_lock.release()
-
 
                 lock.acquire()
                 NamedPipe.request_list.append(
@@ -143,34 +150,38 @@ class Interpreter:
         self.model_interpreter_dict = {}
         self.model_path_list = []
 
+
     def make_model_path_list(self):
         self.model_path_dict = {}
         # todo
         # 요청을 받을때 model path를 list에 추가함으로써
-        model_segment1 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Efficient_L/efficientnet-edgetpu-L_quant_segment_0_of_3_edgetpu.tflite'
-        model_segment2 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Efficient_L/efficientnet-edgetpu-L_quant_segment_1_of_3_edgetpu.tflite'
-        model_segment3 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Efficient_L/efficientnet-edgetpu-L_quant_segment_2_of_3_edgetpu.tflite'
+        model_segment1 = '/home/hun/WorkSpace/coral/pycoral/model/co_segment/Efficient_L/efficientnet-edgetpu-L_quant_segment_0_of_3_edgetpu.tflite'
+        model_segment2 = '/home/hun/WorkSpace/coral/pycoral/model/co_segment/Efficient_L/efficientnet-edgetpu-L_quant_segment_1_of_3_edgetpu.tflite'
+        model_segment3 = '/home/hun/WorkSpace/coral/pycoral/model/co_segment/Efficient_L/efficientnet-edgetpu-L_quant_segment_2_of_3_edgetpu.tflite'
         model_name = 'EfficientNet_L'
-        self.model_path_dict[model_name] = [model_segment1, model_segment2, model_segment3]
+        self.model_path_dict[model_name] = [
+            model_segment1, model_segment2, model_segment3]
 
-        model_segment1 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Efficient_M/efficientnet-edgetpu-M_quant_segment_0_of_3_edgetpu.tflite'
-        model_segment2 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Efficient_M/efficientnet-edgetpu-M_quant_segment_1_of_3_edgetpu.tflite'
-        model_segment3 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Efficient_M/efficientnet-edgetpu-M_quant_segment_2_of_3_edgetpu.tflite'
+        model_segment1 = '/home/hun/WorkSpace/coral/pycoral/model/co_segment/Efficient_M/efficientnet-edgetpu-M_quant_segment_0_of_3_edgetpu.tflite'
+        model_segment2 = '/home/hun/WorkSpace/coral/pycoral/model/co_segment/Efficient_M/efficientnet-edgetpu-M_quant_segment_1_of_3_edgetpu.tflite'
+        model_segment3 = '/home/hun/WorkSpace/coral/pycoral/model/co_segment/Efficient_M/efficientnet-edgetpu-M_quant_segment_2_of_3_edgetpu.tflite'
         model_name = 'EfficientNet_M'
-        self.model_path_dict[model_name] = [model_segment1, model_segment2, model_segment3]
+        self.model_path_dict[model_name] = [
+            model_segment1, model_segment2, model_segment3]
 
-        model_segment1 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Efficient_S/efficientnet-edgetpu-S_quant_segment_0_of_3_edgetpu.tflite'
-        model_segment2 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Efficient_S/efficientnet-edgetpu-S_quant_segment_1_of_3_edgetpu.tflite'
-        model_segment3 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Efficient_S/efficientnet-edgetpu-S_quant_segment_2_of_3_edgetpu.tflite'
+        model_segment1 = '/home/hun/WorkSpace/coral/pycoral/model/co_segment/Efficient_S/efficientnet-edgetpu-S_quant_segment_0_of_3_edgetpu.tflite'
+        model_segment2 = '/home/hun/WorkSpace/coral/pycoral/model/co_segment/Efficient_S/efficientnet-edgetpu-S_quant_segment_1_of_3_edgetpu.tflite'
+        model_segment3 = '/home/hun/WorkSpace/coral/pycoral/model/co_segment/Efficient_S/efficientnet-edgetpu-S_quant_segment_2_of_3_edgetpu.tflite'
         model_name = 'EfficientNet_S'
-        self.model_path_dict[model_name] = [model_segment1, model_segment2, model_segment3]
+        self.model_path_dict[model_name] = [
+            model_segment1, model_segment2, model_segment3]
 
-        model_segment1 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Mobilenet_V1/mobilenet_v1_1.0_224_quant_segment_0_of_3_edgetpu.tflite'
-        model_segment2 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Mobilenet_V1/mobilenet_v1_1.0_224_quant_segment_1_of_3_edgetpu.tflite'
-        model_segment3 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Mobilenet_V1/mobilenet_v1_1.0_224_quant_segment_2_of_3_edgetpu.tflite'
-        model_name = 'MobileNet_V1'
-        self.model_path_dict[model_name] = [model_segment1, model_segment2, model_segment3]
-
+        # model_segment1 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Mobilenet_V1/mobilenet_v1_1.0_224_quant_segment_0_of_3_edgetpu.tflite'
+        # model_segment2 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Mobilenet_V1/mobilenet_v1_1.0_224_quant_segment_1_of_3_edgetpu.tflite'
+        # model_segment3 = '/home/hun/WorkSpace/coral/pycoral/model/segment/Mobilenet_V1/mobilenet_v1_1.0_224_quant_segment_2_of_3_edgetpu.tflite'
+        # model_name = 'MobileNet_V1'
+        # self.model_path_dict[model_name] = [
+        #     model_segment1, model_segment2, model_segment3]
 
     def initialize_model_dict(self):
         self.make_model_path_list()
@@ -181,6 +192,84 @@ class Interpreter:
                 interpreter_segment.allocate_tensors()
                 interpreter_segment_list.append(interpreter_segment)
             self.model_interpreter_dict[model_name] = interpreter_segment_list
+
+
+
+    def initialize_model(self):
+
+    # common.set_input(interpreter[0], normalized_input.astype(np.uint8)
+        for name in self.model_interpreter_dict.keys():
+            image = Scheduler.openimage(None,0,0.01245,129,name)
+            intermediate_output = {}
+            self.model_interpreter_dict[name][0].set_tensor(1,image)
+            self.model_interpreter_dict[name][0].invoke()
+            
+            for output_detail in self.model_interpreter_dict[name][0].get_output_details():
+                intermediate_output[output_detail['name']] = self.model_interpreter_dict[name][0].get_tensor(output_detail['index'])
+
+            for input_detail in self.model_interpreter_dict[name][1].get_input_details():
+                for key,value in intermediate_output.items():
+                    if key == input_detail['name']:
+                        tensor_index = input_detail['index']
+                        self.model_interpreter_dict[name][1].set_tensor(tensor_index, value)
+                            
+            self.model_interpreter_dict[name][1].invoke()
+            for output_detail in self.model_interpreter_dict[name][1].get_output_details():
+                intermediate_output[output_detail['name']] = self.model_interpreter_dict[name][1].get_tensor(output_detail['index'])
+
+        
+            for input_detail in self.model_interpreter_dict[name][2].get_input_details():
+                for key,value in intermediate_output.items():
+                    if key == input_detail['name']:
+                        tensor_index = input_detail['index']
+                        self.model_interpreter_dict[name][2].set_tensor(tensor_index, value)
+
+
+            self.model_interpreter_dict[name][2].invoke()
+
+
+            
+#   intermediate_output = {}
+#         time.sleep(1e-6)
+#         invoke_start = time.perf_counter()
+#         interpreter[0].set_tensor(1,image)
+#         interpreter[0].invoke()
+#         interpreter[0].set_tensor(0, normalized_input.astype(np.uint8))
+#         print(intermediate_output)
+#         print('-----------------------------')
+#         print(interpreter[1].get_input_details())
+        
+#         for output_detail in interpreter[0].get_output_details():
+#             intermediate_output[output_detail['name']] = interpreter[0].get_tensor(output_detail['index'])
+
+#         for input_detail in interpreter[1].get_input_details():
+#             for key,value in intermediate_output.items():
+#                 if key == input_detail['name']:
+#                     tensor_index = input_detail['index']
+#                     interpreter[1].set_tensor(tensor_index, value)
+
+    
+#         interpreter[1].invoke()
+#         for output_detail in interpreter[1].get_output_details():
+#             intermediate_output[output_detail['name']] = interpreter[1].get_tensor(output_detail['index'])
+
+    
+#         for input_detail in interpreter[2].get_input_details():
+#             for key,value in intermediate_output.items():
+#                 if key == input_detail['name']:
+#                     tensor_index = input_detail['index']
+#                     interpreter[2].set_tensor(tensor_index, value)
+
+
+#         interpreter[2].invoke()
+#         classes = classify.get_classes(interpreter[2], 1, 0.0)
+
+#         for c in classes:
+#             print('%s: %.5f\n' % (labels.get(c.id, c.id), c.score))
+        
+#         invoke_end = (time.perf_counter()- invoke_start) * 1000
+#         print(str(invoke_end) + "ms")
+ 
 
 
 class Analyzer:
@@ -249,6 +338,7 @@ class Analyzer:
 class Scheduler:
     success = 0
     fail = 0
+    
 
     def __init__(self, Interpreter):
         self.interpreter = Interpreter
@@ -257,7 +347,40 @@ class Scheduler:
         self.intermediate_output = []
         self.prev_output = {}
 
+        self.image_L = self.openimage(
+            (300, 300),  0.01245984, 129)  # size, scale, zeropoint
+        self.image_M = self.openimage((240, 240),  0.01208907, 129)
+        self.image_S = self.openimage((224, 224),  0.01256602, 131)
+        
+        self.L = open('Efficient_L', 'w')
+        self.M = open('Efficient_M', 'w')
+        self.S = open('Efficient_S', 'w')
+        
+
+    def openimage(self, size, scale, zero_point , model_name= None):
+        if model_name:
+            if model_name == 'EfficientNet_L':
+                size = (300,300)
+            elif model_name == 'EfficientNet_M':
+                size = (240,240)
+            elif model_name == 'EfficientNet_S':
+                size = (224,224)
+                
+        mean = 128.0
+        std = 128.0
+        image = Image.open(
+            './imageDir/n0153282900000036.jpg').convert('RGB').resize(size, Image.ANTIALIAS)
+        normalized_input = (np.asarray(image) - mean) / \
+            (std * scale) + zero_point
+        np.clip(normalized_input, 0, 255, out=normalized_input)
+        return_value = np.array(normalized_input.astype(np.uint8))[
+            np.newaxis, :]
+
+        return return_value
+
     def schedule(self):
+
+
         while True:
             time.sleep(1e-9)
             # preempt된 task부터 있는지 확인
@@ -300,7 +423,8 @@ class Scheduler:
             # intermediate_output에 저장되어있는 segment를 실행해야 한다
             if execute_segment_flag:
                 # 있으면 priority 제일 높은 segment부터 실행
-                self.intermediate_output.sort(key=lambda x: x["priority"], reverse=True)
+                self.intermediate_output.sort(
+                    key=lambda x: x["priority"], reverse=True)
                 next_task = self.intermediate_output.pop(0)
                 to_client = next_task["to_client"]
                 self.prev_output = next_task["intermediate_output"]
@@ -310,7 +434,7 @@ class Scheduler:
                 priority = next_task["priority"]
                 request_time = next_task["request_time"]
                 deadline = next_task["deadline"]
-                print('{} was preempted'.format(modelName))
+                # print('{} was preempted'.format(modelName))
                 # print('executing preempted segment model = {}  ,index = {}'.format(modelName, next_index))
 
                 # 현재 실행하고 있는 task를 기록해둔다
@@ -326,14 +450,16 @@ class Scheduler:
                     # executing last segment
                     # 마지막 segment를 실행 한 후에는 classify.get_classes를 진행 후 client에게 write
                     if i == segment_num - 1:
-                        print(' i == segment_num - 1')
-                        self.invoke_last_index(modelName,i,to_client,request_time,deadline)
+                        # print(' i == segment_num - 1')
+                        self.invoke_last_index(
+                            modelName, i, to_client, request_time, deadline)
                     # executing middle segment
                     # 중간에 preempt될 가능성 있음
                     else:
-                        print('else')
+                        # print('else')
                         # print('i is not segment_num - 1   , i == {}'.format(i))
-                        self.prev_output = self.invoke_middle_index(modelName,i)
+                        self.prev_output = self.invoke_middle_index(
+                            modelName, i)
 
                         preempt_lock.acquire()
                         # preempt flag가 true면 이번 segment output 저장
@@ -352,7 +478,6 @@ class Scheduler:
                         else:
                             preempt_lock.release()
 
-
             elif execute_request_flag:
                 ##FIFO##
                 lock.acquire()
@@ -366,13 +491,19 @@ class Scheduler:
                 NamedPipe.current_task["model_name"] = modelName
                 NamedPipe.current_task["priority"] = 1/period
 
+                if modelName == 'EfficientNet_L':
+                    image = self.image_L
+                elif modelName == 'EfficientNet_M':
+                    image = self.image_M
+                elif modelName == 'EfficientNet_S':
+                    image = self.image_S
+
                 lock.release()
                 ########
                 preempt_lock.acquire()
                 NamedPipe.preempt_flag = False
                 preempt_lock.release()
 
-                imagePath = './imageDir/' + who[1]
                 request_time = who[2]
                 segment_num = who[4]
                 deadline = period
@@ -383,7 +514,8 @@ class Scheduler:
                     # executing first segment
                     # image resize 하는 부분 필요
                     if i == 0:
-                        self.prev_output = self.invoke_first_index(modelName,i,imagePath)
+                        self.prev_output = self.invoke_first_index(
+                            modelName, i, image)
 
                         preempt_lock.acquire()
                         if NamedPipe.preempt_flag == True:
@@ -404,12 +536,14 @@ class Scheduler:
                     # executing last segment
                     # classfiy.get_classes후 client에 write하는 과정 필요
                     elif i == segment_num - 1:
-                        self.invoke_last_index(modelName,i,to_client,request_time,deadline)
+                        self.invoke_last_index(
+                            modelName, i, to_client, request_time, deadline)
 
                     # executing middle segment
                     # 중간에 preempt될 가능성 있음
                     else:
-                        self.prev_output = self.invoke_middle_index(modelName,i)
+                        self.prev_output = self.invoke_middle_index(
+                            modelName, i)
 
                         preempt_lock.acquire()
                         # preempt flag가 true면 이번 segment output 저장
@@ -428,49 +562,25 @@ class Scheduler:
                         else:
                             preempt_lock.release()
 
-
-    def invoke_first_index(self,model_name,i,imagePath):
+    def invoke_first_index(self, model_name, i, image):
+        # print('1')
         assigned_interpreter = interpreter.model_interpreter_dict[model_name][0]
-        if common.input_details(assigned_interpreter, 'dtype') != np.uint8:
-            raise ValueError('Only support uint8 input type.')
-        imageResizeStart = time.perf_counter()
 
-        size = common.input_size(assigned_interpreter)
-        image = Image.open(imagePath).convert(
-            'RGB').resize(size, Image.ANTIALIAS)
-        # image_resize_end = time.perf_counter()
-        # image_resize_time = (image_resize_end - imageResizeStart) * 1000
-        # print(image_resize_time)
-        params = common.input_details(
-            assigned_interpreter, 'quantization_parameters')
-        scale = params['scales']
-        zero_point = params['zero_points']
-
-        mean = 128.0
-        std = 128.0
-        if abs(scale * std - 1) < 1e-5 and abs(mean - zero_point) < 1e-5:
-            # Input data does not require preprocessing.
-            common.set_input(assigned_interpreter, image)
-        else:
-            # Input data requires preprocessing
-            normalized_input = (np.asarray(image) - mean) / \
-                (std * scale) + zero_point
-            np.clip(normalized_input, 0, 255,
-                    out=normalized_input)
-            common.set_input(
-                assigned_interpreter, normalized_input.astype(np.uint8))
+        assigned_interpreter.set_tensor(1, image)
         assigned_interpreter.invoke()
 
         for output_detail in assigned_interpreter.get_output_details():
-            self.prev_output[output_detail['name']] =  assigned_interpreter.get_tensor(output_detail['index'])
+            self.prev_output[output_detail['name']] = assigned_interpreter.get_tensor(
+                output_detail['index'])
 
         return self.prev_output
 
     def invoke_middle_index(self, model_name, i):
+        # print('2')
         assigned_interpreter = interpreter.model_interpreter_dict[model_name][i]
 
         for input_detail in assigned_interpreter.get_input_details():
-            for key,value in self.prev_output.items():
+            for key, value in self.prev_output.items():
                 if key == input_detail['name']:
                     tensor_index = input_detail['index']
                     assigned_interpreter.set_tensor(tensor_index, value)
@@ -478,16 +588,17 @@ class Scheduler:
         assigned_interpreter.invoke()
 
         for output_detail in assigned_interpreter.get_output_details():
-            self.prev_output[output_detail['name']] =  assigned_interpreter.get_tensor(output_detail['index'])
+            self.prev_output[output_detail['name']] = assigned_interpreter.get_tensor(
+                output_detail['index'])
 
         return self.prev_output
 
-
-    def invoke_last_index(self,model_name,i,to_client,request_time,deadline):
+    def invoke_last_index(self, model_name, i, to_client, request_time, deadline):
+        # print('3')
         assigned_interpreter = interpreter.model_interpreter_dict[model_name][i]
 
         for input_detail in assigned_interpreter.get_input_details():
-            for key,value in self.prev_output.items():
+            for key, value in self.prev_output.items():
                 if key == input_detail['name']:
                     tensor_index = input_detail['index']
                     assigned_interpreter.set_tensor(tensor_index, value)
@@ -500,12 +611,33 @@ class Scheduler:
         msg = ''
         for c in classes:
             msg = msg + ('%s: %.5f\n' %
-                            (self.labels.get(c.id, c.id), c.score))
+                         (self.labels.get(c.id, c.id), c.score))
         os.write(to_client, msg.encode())
 
-        response_time = time.perf_counter() - request_time
 
-        # print('response_time = {}ms'.format(response_time * 1000))
+        response_time = time.perf_counter() - request_time
+        
+        try_num = 10000
+        if model_name == 'EfficientNet_L':
+           
+            # print('model Name = {} time {}'.format(modelName,response_time))
+            if Scheduler.success + Scheduler.fail < try_num:
+                self.L.write(str(response_time * 1000) + '\n')           
+            else:
+                self.L.close()
+        elif model_name == 'EfficientNet_M':
+            # print('model Name = {} time {}'.format(modelName,response_time))
+            if Scheduler.success + Scheduler.fail < try_num:
+                self.M.write(str(response_time * 1000) + '\n')                
+            else:
+                self.M.close()
+        elif model_name == 'EfficientNet_S':
+            print(response_time * 1000)
+            # print('model Name = {} time {}'.format(modelName,response_time))
+            if Scheduler.success + Scheduler.fail < try_num:
+                self.S.write(str(response_time * 1000) + '\n')             
+            else:
+                self.S.close()
 
         if response_time < deadline:
             # print('------------------------------------------')
@@ -513,8 +645,6 @@ class Scheduler:
         else:
             # print('------------------------------------------')
             Scheduler.fail = Scheduler.fail + 1
-
-
 
     def run(self):
         self.schedule_thread = threading.Thread(target=self.schedule, args=())
@@ -524,14 +654,14 @@ class Scheduler:
 if __name__ == '__main__':
     os.system('rm ./Pipe/*')
 
-    named_pipe = NamedPipe()
-    named_pipe.run()
-
     interpreter = Interpreter()
     interpreter.initialize_model_dict()
+    interpreter.initialize_model()
 
+    named_pipe = NamedPipe()
     scheduler = Scheduler(interpreter)
-    scheduler.run()
-
     analyzer = Analyzer(scheduler)
+
+    named_pipe.run()
+    scheduler.run()
     analyzer.run()
